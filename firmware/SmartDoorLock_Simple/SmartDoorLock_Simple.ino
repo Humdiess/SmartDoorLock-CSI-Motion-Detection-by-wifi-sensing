@@ -236,19 +236,23 @@ void updateBeepState() {
 // ================= MOTION DETECTION =================
 void read_signal_variance() {
   int rssi = WiFi.RSSI();
-  static int lastRssi = -100;
-
-  float diff = abs(rssi - lastRssi);
-  varianceBuffer[bufIdx] = diff;
+  
+  // Store RSSI in buffer for baseline calculation
+  varianceBuffer[bufIdx] = rssi;
   bufIdx = (bufIdx + 1) % 20;
-  lastRssi = rssi;
-
-  float sum = 0;
+  
+  // Calculate baseline (average RSSI)
+  float sumRssi = 0;
   for (int i = 0; i < 20; i++) {
-    sum += varianceBuffer[i];
+    sumRssi += varianceBuffer[i];
   }
-
-  currentVariance = (sum / 20.0) / 10.0;
+  float baselineRssi = sumRssi / 20.0;
+  
+  // Calculate absolute deviation from baseline
+  float deviation = abs(rssi - baselineRssi);
+  
+  // Normalize to 0-1 range (assuming max deviation of 30 dBm)
+  currentVariance = deviation / 30.0;
   if (currentVariance > 1.0)
     currentVariance = 1.0;
 }
@@ -294,7 +298,7 @@ void send_to_server() {
     return;
 
   HTTPClient http;
-  http.setTimeout(5000);
+  http.setTimeout(3000); // Reduced from 5000ms to prevent watchdog issues
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
 
@@ -380,6 +384,10 @@ void setup() {
     Serial.println(WiFi.localIP());
     Serial.print("[WiFi] RSSI: ");
     Serial.println(WiFi.RSSI());
+    
+    // CRITICAL FIX: Disable WiFi power saving to prevent disconnections
+    WiFi.setSleep(false);
+    Serial.println("[WiFi] Power saving DISABLED - stable connection mode");
   } else {
     Serial.println("\n[WiFi] Failed to connect!");
     updateLCD("WiFi Failed", "Check settings");
@@ -399,6 +407,39 @@ void setup() {
 // ================= LOOP =================
 void loop() {
   unsigned long now = millis();
+
+  // 0. Check WiFi connection and reconnect if needed
+  static unsigned long lastWiFiCheck = 0;
+  if (now - lastWiFiCheck > 10000) { // Check every 10 seconds
+    lastWiFiCheck = now;
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[WiFi] DISCONNECTED! Attempting reconnect...");
+      updateLCD("WiFi Lost", "Reconnecting...");
+      
+      WiFi.disconnect();
+      delay(100);
+      WiFi.begin(ssid, password);
+      
+      int attempts = 0;
+      while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+      }
+      
+      if (WiFi.status() == WL_CONNECTED) {
+        WiFi.setSleep(false); // Re-disable power saving
+        Serial.println("\n[WiFi] RECONNECTED!");
+        Serial.print("[WiFi] IP: ");
+        Serial.println(WiFi.localIP());
+        updateLCD("WiFi Restored", "Connected");
+        delay(1000);
+        updateLCD("Smart Door Lock", isDoorLocked ? "Locked - Scan" : "Unlocked");
+      } else {
+        Serial.println("\n[WiFi] Reconnect FAILED");
+      }
+    }
+  }
 
   // 1. Read variance
   if (!isCalibrating) {
