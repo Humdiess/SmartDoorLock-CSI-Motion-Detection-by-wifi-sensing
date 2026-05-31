@@ -14,17 +14,24 @@
 
 #include <Arduino.h>
 #include <HTTPClient.h>
-#include <LiquidCrystal_I2C.h>
 #include <MFRC522.h>
 #include <SPI.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_I2Cexp.h>
 #include <esp_wifi.h>
 #include <time.h> // For NTP time sync
 
 // ================= KONFIGURASI =================
+// Primary WiFi
 const char *ssid = "Kucing Salto";
 const char *password = "ucing8382428";
+
+// Fallback Hotspot
+const char *hotspot_ssid = "SmartLock_Hotspot";
+const char *hotspot_password = "ucing8382428";
+
 const char *SERVER_URL = "http://192.168.1.7:3000/api/motion";
 
 // Pin definitions
@@ -62,7 +69,7 @@ bool timeInitialized = false;
 
 // ================= HARDWARE OBJECTS =================
 MFRC522 rfid(SS_PIN, RST_PIN);
-LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
+hd44780_I2Cexp lcd;
 
 // Authorized RFID UIDs
 byte authorizedUIDs[][4] = {{0xDB, 0x63, 0x03, 0x07}};
@@ -90,9 +97,11 @@ float currentVariance = 0.0;
 bool isMotionDetected = false;
 bool isCalibrating = true;
 bool isDoorLocked = true;
+String connectedWiFi = "None";
 unsigned long motionStartMillis = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastRFIDCheck = 0;
+unsigned long lastCommandCheck = 0;
 
 float varianceBuffer[20];
 int bufIdx = 0;
@@ -236,23 +245,19 @@ void updateBeepState() {
 // ================= MOTION DETECTION =================
 void read_signal_variance() {
   int rssi = WiFi.RSSI();
-  
-  // Store RSSI in buffer for baseline calculation
-  varianceBuffer[bufIdx] = rssi;
+  static int lastRssi = -100;
+
+  float diff = abs(rssi - lastRssi);
+  varianceBuffer[bufIdx] = diff;
   bufIdx = (bufIdx + 1) % 20;
-  
-  // Calculate baseline (average RSSI)
-  float sumRssi = 0;
+  lastRssi = rssi;
+
+  float sum = 0;
   for (int i = 0; i < 20; i++) {
-    sumRssi += varianceBuffer[i];
+    sum += varianceBuffer[i];
   }
-  float baselineRssi = sumRssi / 20.0;
-  
-  // Calculate absolute deviation from baseline
-  float deviation = abs(rssi - baselineRssi);
-  
-  // Normalize to 0-1 range (assuming max deviation of 30 dBm)
-  currentVariance = deviation / 30.0;
+
+  currentVariance = (sum / 20.0) / 10.0;
   if (currentVariance > 1.0)
     currentVariance = 1.0;
 }
@@ -308,6 +313,7 @@ void send_to_server() {
   json += "\"motion\":" + String(isMotionDetected ? "true" : "false") + ",";
   json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
   json += "\"doorLocked\":" + String(isDoorLocked ? "true" : "false") + ",";
+  json += "\"connectedWiFi\":\"" + connectedWiFi + "\",";
   json += "\"timestamp\":" + String(millis());
   json += "}";
 
@@ -330,6 +336,143 @@ void send_to_server() {
   http.end();
 }
 
+void postLog(const String& type, const String& message) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  http.setTimeout(3000);
+  String url = String(SERVER_URL);
+  url.replace("/motion", "/logs");
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  
+  String json = "{\"type\":\"" + type + "\",\"message\":\"" + message + "\"}";
+  http.POST(json);
+  http.end();
+}
+
+void checkWebCommands() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.setTimeout(3000);
+  String url = String(SERVER_URL);
+  url.replace("/motion", "/control/commands");
+
+  http.begin(url);
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode == 200) {
+    String payload = http.getString();
+    
+    if (payload.indexOf("\"command\":\"door:unlock\"") >= 0) {
+      Serial.println("[COMMAND] Web Unlocking Door!");
+      controlDoor(false);
+      doorState = DOOR_UNLOCKED;
+      doorStateTime = millis();
+      postLog("system", "Manual door unlock command from dashboard");
+    } 
+    else if (payload.indexOf("\"command\":\"door:lock\"") >= 0) {
+      Serial.println("[COMMAND] Web Locking Door!");
+      controlDoor(true);
+      doorState = DOOR_IDLE;
+      postLog("system", "Manual door lock command from dashboard");
+    }
+    else if (payload.indexOf("\"command\":\"buzzer:on\"") >= 0) {
+      Serial.println("[COMMAND] Web Buzzer ON!");
+      digitalWrite(PIN_BUZZER, HIGH);
+      postLog("system", "Manual buzzer ON command from dashboard");
+    }
+    else if (payload.indexOf("\"command\":\"buzzer:off\"") >= 0) {
+      Serial.println("[COMMAND] Web Buzzer OFF!");
+      digitalWrite(PIN_BUZZER, LOW);
+      postLog("system", "Manual buzzer OFF command from dashboard");
+    }
+    else if (payload.indexOf("\"command\":\"lcd:") >= 0) {
+      int idx = payload.indexOf("\"command\":\"lcd:");
+      int start = idx + 15;
+      int end = payload.indexOf("|", start);
+      if (end > start) {
+        String msg = payload.substring(start, end);
+        Serial.printf("[COMMAND] Web LCD Message: %s\n", msg.c_str());
+        updateLCD("SYSTEM ALERT:", msg.c_str());
+        doorState = DOOR_DENIED;
+        doorStateTime = millis();
+        postLog("system", "LCD display message updated: " + msg);
+      }
+    }
+    else if (payload.indexOf("\"command\":\"calibrate\"") >= 0) {
+      Serial.println("[COMMAND] Web Calibration Request!");
+      isCalibrating = true;
+      calibrate_system();
+      postLog("system", "Manual calibration triggered from dashboard");
+    }
+    else if (payload.indexOf("\"command\":\"threshold:") >= 0) {
+      int idx = payload.indexOf("\"command\":\"threshold:");
+      int start = idx + 21;
+      int end = payload.indexOf("\"", start);
+      if (end > start) {
+        String thrStr = payload.substring(start, end);
+        float newThr = thrStr.toFloat();
+        if (newThr > 0 && newThr <= 1.0) {
+          currentThreshold = newThr;
+          Serial.printf("[COMMAND] Threshold updated to: %.3f\n", newThr);
+          postLog("system", "Threshold updated from dashboard: " + String(newThr, 3));
+        }
+      }
+    }
+  }
+  http.end();
+}
+
+// ================= WIFI CONNECTION =================
+bool connectWiFi() {
+  // Try primary WiFi first
+  Serial.println("[WiFi] Trying primary WiFi...");
+  WiFi.begin(ssid, password);
+  updateLCD("WiFi: Primary", "Connecting...");
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  Serial.println();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[WiFi] Connected to primary! IP: ");
+    Serial.println(WiFi.localIP());
+    updateLCD("WiFi: Primary", "Connected!");
+    delay(1000);
+    return true;
+  }
+  
+  // Fallback to hotspot
+  Serial.println("[WiFi] Primary failed, trying hotspot...");
+  WiFi.begin(hotspot_ssid, hotspot_password);
+  updateLCD("WiFi: Hotspot", "Connecting...");
+  
+  attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  Serial.println();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[WiFi] Connected to hotspot! IP: ");
+    Serial.println(WiFi.localIP());
+    updateLCD("WiFi: Hotspot", "Connected!");
+    delay(1000);
+    return true;
+  }
+  
+  Serial.println("[WiFi] Both connections failed!");
+  updateLCD("WiFi Failed", "Check settings");
+  return false;
+}
+
 // ================= SETUP =================
 void setup() {
   Serial.begin(115200);
@@ -350,10 +493,13 @@ void setup() {
 
   // Initialize LCD
   Wire.begin(LCD_SDA, LCD_SCL);
-  lcd.init();
-  lcd.backlight();
+  int status = lcd.begin(16, 2);
+  if (status) {
+    Serial.printf("[LCD] Init failed: %d\n", status);
+  } else {
+    Serial.println("[LCD] OK");
+  }
   updateLCD("Smart Door Lock", "Starting...");
-  Serial.println("[LCD] OK");
 
   // Initialize RFID
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
@@ -366,31 +512,31 @@ void setup() {
     Serial.printf("[RFID] Warning: v=0x%X (might not be connected)\n", rfidVer);
   }
 
-  // Connect WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("[WiFi] Connecting");
-  updateLCD("Connecting WiFi", "Please wait...");
-
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println();
-    Serial.print("[WiFi] Connected! IP: ");
-    Serial.println(WiFi.localIP());
+  // Connect WiFi with fallback
+  bool wifiConnected = connectWiFi();
+  
+  if (wifiConnected) {
     Serial.print("[WiFi] RSSI: ");
     Serial.println(WiFi.RSSI());
+    
+    // Store which WiFi we're connected to
+    String currentSSID = WiFi.SSID();
+    if (currentSSID == ssid) {
+      connectedWiFi = "Primary";
+    } else if (currentSSID == hotspot_ssid) {
+      connectedWiFi = "Hotspot";
+    } else {
+      connectedWiFi = currentSSID;
+    }
+    Serial.print("[WiFi] Connected to: ");
+    Serial.println(connectedWiFi);
     
     // CRITICAL FIX: Disable WiFi power saving to prevent disconnections
     WiFi.setSleep(false);
     Serial.println("[WiFi] Power saving DISABLED - stable connection mode");
   } else {
-    Serial.println("\n[WiFi] Failed to connect!");
-    updateLCD("WiFi Failed", "Check settings");
+    connectedWiFi = "Offline";
+    Serial.println("[WiFi] No connection available - system will run in offline mode");
   }
 
   // Calibrate
@@ -506,6 +652,12 @@ void loop() {
   if (now - lastSendTime > 2000) {
     send_to_server();
     lastSendTime = now;
+  }
+
+  // 6. Poll web commands (every 1 second)
+  if (now - lastCommandCheck > 1000) {
+    checkWebCommands();
+    lastCommandCheck = now;
   }
 
   delay(100);

@@ -19,12 +19,19 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_I2Cexp.h>
 #include <time.h>  // For NTP time sync
 
 // ================= KONFIGURASI =================
+// Primary WiFi
 const char* ssid = "Kucing Salto";
 const char* password = "ucing8382428";
+
+// Fallback Hotspot
+const char* hotspot_ssid = "SmartLock_Hotspot";
+const char* hotspot_password = "ucing8382428";
+
 const char* SERVER_URL = "http://192.168.1.7:3000/api/motion"; 
 
 // Pin definitions
@@ -62,7 +69,7 @@ bool timeInitialized = false;
 
 // ================= HARDWARE OBJECTS =================
 MFRC522 rfid(SS_PIN, RST_PIN);
-LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
+hd44780_I2Cexp lcd;
 
 // Authorized RFID UIDs
 byte authorizedUIDs[][4] = { {0xDB, 0x63, 0x03, 0x07} };
@@ -94,6 +101,7 @@ unsigned long motionStartMillis = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastRFIDCheck = 0;
 String lastScannedUID = "None";
+String connectedWiFi = "None";
 String lastScannedStatus = "None";
 
 float varianceBuffer[20];
@@ -329,6 +337,7 @@ void send_to_server() {
   json += "\"doorLocked\":" + String(isDoorLocked ? "true" : "false") + ",";
   json += "\"lastRfidUid\":\"" + lastScannedUID + "\",";
   json += "\"lastRfidStatus\":\"" + lastScannedStatus + "\",";
+  json += "\"connectedWiFi\":\"" + connectedWiFi + "\",";
   json += "\"timestamp\":" + String(millis());
   json += "}";
 
@@ -430,8 +439,77 @@ void checkWebCommands() {
         postLog("system", "LCD display message updated: " + msg);
       }
     }
+    else if (payload.indexOf("\"command\":\"calibrate\"") >= 0) {
+      Serial.println("[COMMAND] Web Calibration Request!");
+      isCalibrating = true;
+      calibrate_system();
+      postLog("system", "Manual calibration triggered from dashboard");
+    }
+    else if (payload.indexOf("\"command\":\"threshold:") >= 0) {
+      int idx = payload.indexOf("\"command\":\"threshold:");
+      int start = idx + 21; // offset to parse threshold value
+      int end = payload.indexOf("\"", start);
+      if (end > start) {
+        String thrStr = payload.substring(start, end);
+        float newThr = thrStr.toFloat();
+        if (newThr > 0 && newThr <= 1.0) {
+          currentThreshold = newThr;
+          Serial.printf("[COMMAND] Threshold updated to: %.3f\n", newThr);
+          postLog("system", "Threshold updated from dashboard: " + String(newThr, 3));
+        }
+      }
+    }
   }
   http.end();
+}
+
+// ================= WIFI CONNECTION =================
+bool connectWiFi() {
+  // Try primary WiFi first
+  Serial.println("[WiFi] Trying primary WiFi...");
+  WiFi.begin(ssid, password);
+  updateLCD("WiFi: Primary", "Connecting...");
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  Serial.println();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[WiFi] Connected to primary! IP: ");
+    Serial.println(WiFi.localIP());
+    updateLCD("WiFi: Primary", "Connected!");
+    delay(1000);
+    return true;
+  }
+  
+  // Fallback to hotspot
+  Serial.println("[WiFi] Primary failed, trying hotspot...");
+  WiFi.begin(hotspot_ssid, hotspot_password);
+  updateLCD("WiFi: Hotspot", "Connecting...");
+  
+  attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  Serial.println();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[WiFi] Connected to hotspot! IP: ");
+    Serial.println(WiFi.localIP());
+    updateLCD("WiFi: Hotspot", "Connected!");
+    delay(1000);
+    return true;
+  }
+  
+  Serial.println("[WiFi] Both connections failed!");
+  updateLCD("WiFi Failed", "Check settings");
+  return false;
 }
 
 // ================= SETUP =================
@@ -454,10 +532,13 @@ void setup() {
 
   // Initialize LCD
   Wire.begin(LCD_SDA, LCD_SCL);
-  lcd.init();
-  lcd.backlight();
+  int status = lcd.begin(16, 2);
+  if (status) {
+    Serial.printf("[LCD] Init failed: %d\n", status);
+  } else {
+    Serial.println("[LCD] OK");
+  }
   updateLCD("Smart Door Lock", "Starting...");
-  Serial.println("[LCD] OK");
 
   // Initialize RFID
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
@@ -470,27 +551,27 @@ void setup() {
     Serial.printf("[RFID] Warning: v=0x%X (might not be connected)\n", rfidVer);
   }
 
-  // Connect WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("[WiFi] Connecting");
-  updateLCD("Connecting WiFi", "Please wait...");
+  // Connect WiFi with fallback
+  bool wifiConnected = connectWiFi();
   
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println();
-    Serial.print("[WiFi] Connected! IP: ");
-    Serial.println(WiFi.localIP());
+  if (wifiConnected) {
     Serial.print("[WiFi] RSSI: ");
     Serial.println(WiFi.RSSI());
+    
+    // Store which WiFi we're connected to
+    String currentSSID = WiFi.SSID();
+    if (currentSSID == ssid) {
+      connectedWiFi = "Primary";
+    } else if (currentSSID == hotspot_ssid) {
+      connectedWiFi = "Hotspot";
+    } else {
+      connectedWiFi = currentSSID;
+    }
+    Serial.print("[WiFi] Connected to: ");
+    Serial.println(connectedWiFi);
   } else {
-    Serial.println("\n[WiFi] Failed to connect!");
-    updateLCD("WiFi Failed", "Check settings");
+    connectedWiFi = "Offline";
+    Serial.println("[WiFi] No connection available - system will run in offline mode");
   }
 
   // Calibrate
