@@ -331,7 +331,7 @@ export default function SmartGuard() {
 
   /* ── RENDER ─────────────────────────────────── */
   return (
-    <div style={{ ...S.root, fontFamily: 'Outfit, sans-serif' }}>
+    <div className="responsive-root" style={{ ...S.root, fontFamily: 'Outfit, sans-serif' }}>
       <Styles />
       <ScanLine />
 
@@ -339,19 +339,19 @@ export default function SmartGuard() {
       <div style={{ ...S.ambientGlow, opacity: isAlert ? 1 : 0 }} />
 
       {/* ── SIDEBAR ── */}
-      <aside style={S.sidebar}>
+      <aside className="responsive-sidebar" style={S.sidebar}>
 
         {/* brand */}
         <div style={S.brand}>
           <ShieldIcon />
           <div>
             <p style={S.brandName}>SmartGuard</p>
-            <p className="ibm" style={S.brandSub}>CSI v2</p>
+            <p className="ibm responsive-sidebar-extra" style={S.brandSub}>CSI v2</p>
           </div>
         </div>
 
         {/* nav */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <nav className="responsive-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {([
             ['dashboard', 'Overview',      OverviewIcon],
             ['settings',  'Configuration', ConfigIcon  ],
@@ -367,10 +367,10 @@ export default function SmartGuard() {
           ))}
         </nav>
 
-        <div style={{ flex: 1 }} />
+        <div className="responsive-sidebar-spacer" style={{ flex: 1 }} />
 
         {/* mini status */}
-        <div style={{
+        <div className="responsive-sidebar-extra" style={{
           ...S.miniStatus,
           background:   isAlert ? 'rgba(232,64,64,0.08)'   : 'rgba(255,255,255,0.025)',
           borderColor:  isAlert ? 'rgba(232,64,64,0.22)'   : 'rgba(255,255,255,0.07)',
@@ -392,7 +392,7 @@ export default function SmartGuard() {
         </div>
 
         {/* connection status */}
-        <div style={{
+        <div className="responsive-sidebar-extra" style={{
           padding: '12px',
           borderRadius: 8,
           background: isConnected ? 'rgba(48,216,138,0.08)' : 'rgba(232,64,64,0.08)',
@@ -421,10 +421,10 @@ export default function SmartGuard() {
       </aside>
 
       {/* ── MAIN ── */}
-      <div style={S.main}>
+      <div className="responsive-main" style={S.main}>
 
         {/* topbar */}
-        <div style={S.topbar}>
+        <div className="responsive-topbar" style={S.topbar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={S.topbarTitle}>
               { tab === 'dashboard' ? 'System Overview'
@@ -447,7 +447,7 @@ export default function SmartGuard() {
         </div>
 
         {/* scrollable content */}
-        <div style={S.content}>
+        <div className="responsive-content" style={S.content}>
 
           {/* ESP32 Connection Warning */}
           {!isConnected && (
@@ -507,7 +507,7 @@ export default function SmartGuard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
               {/* hero split */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
                 {/* left: status */}
                 <div style={{
@@ -521,7 +521,7 @@ export default function SmartGuard() {
                   <DotGrid />
                   <div style={{ position: 'relative' }}>
                     <p className="ibm" style={S.eyebrow}>Motion Status</p>
-                    <p className="barlow" style={{
+                    <p className="barlow responsive-hero-text" style={{
                       fontSize: 76, fontWeight: 700, lineHeight: 0.9,
                       color: isAlert ? '#E84040' : '#30D88A',
                       letterSpacing: '-0.02em', marginBottom: 14,
@@ -558,7 +558,7 @@ export default function SmartGuard() {
                   <MetricCard label="Signal Strength" unit="dBm" value={String(cur?.rssi ?? '—')}>
                     <SignalBar rssi={cur?.rssi ?? -100} />
                   </MetricCard>
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="responsive-flex-col" style={{ display: 'flex', gap: 10 }}>
                     <MetricCard label="Threshold Aktif" value={cur?.threshold.toFixed(3) ?? '—'} accent />
                     <div style={{ ...S.card, padding: '16px 22px', flex: 1 }}>
                       <p className="ibm" style={S.eyebrow}>Last Sync</p>
@@ -668,7 +668,7 @@ export default function SmartGuard() {
                   onChange={setDeb} minLabel="1s" maxLabel="30s"
                 />
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 32 }}>
+                <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 32 }}>
                   <PrimaryBtn onClick={saveSettings}>Simpan Konfigurasi</PrimaryBtn>
                   <GhostBtn   onClick={calibrate}>Kalibrasi Ulang</GhostBtn>
                 </div>
@@ -696,7 +696,7 @@ export default function SmartGuard() {
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>Door Lock Control</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 20 }}>Manual kontrol solenoid lock</p>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <button
                     onClick={() => sendCommand('door', 'unlock')}
                     disabled={sending}
@@ -752,7 +752,7 @@ export default function SmartGuard() {
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>Buzzer Control</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 20 }}>Manual kontrol alarm buzzer</p>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <button
                     onClick={() => sendCommand('buzzer', 'on')}
                     disabled={sending}
@@ -897,14 +897,14 @@ export default function SmartGuard() {
               </div>
 
               <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="ibm" style={{ display: 'grid', gridTemplateColumns: '88px 130px 1fr', gap: 24, padding: '11px 24px', background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 9, letterSpacing: '0.3em', color: '#30333D', textTransform: 'uppercase' }}>
+                <div className="ibm responsive-logs-header" style={{ display: 'grid', gridTemplateColumns: '88px 130px 1fr', gap: 24, padding: '11px 24px', background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 9, letterSpacing: '0.3em', color: '#30333D', textTransform: 'uppercase' }}>
                   <span>Type</span><span>Waktu</span><span>Pesan</span>
                 </div>
 
                 {logs.length > 0 ? logs.map((log, i) => {
                   const m = LOG_META[log.type] ?? LOG_META.system;
                   return (
-                    <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '88px 130px 1fr', gap: 24, padding: '13px 24px', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.013)', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center' }}>
+                    <div key={log.id} className="responsive-log-item" style={{ display: 'grid', gridTemplateColumns: '88px 130px 1fr', gap: 24, padding: '13px 24px', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.013)', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center' }}>
                       <span className="ibm" style={{ fontSize: 9, padding: '3px 7px', borderRadius: 4, color: m.clr, background: m.bg, fontWeight: 700, letterSpacing: '0.12em', width: 'fit-content' }}>{m.tag}</span>
                       <span className="ibm" style={{ fontSize: 11, color: '#3A3D4A' }}>{new Date(log.timestamp).toLocaleTimeString('id-ID')}</span>
                       <span style={{ fontSize: 13, color: '#8A9098' }}>{log.message}</span>
@@ -954,7 +954,7 @@ export default function SmartGuard() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
                   {rfidCards.map((card) => (
-                    <div key={card.id} style={{
+                    <div key={card.id} className="responsive-rfid-item" style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '16px 20px', borderRadius: 10,
                       background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)'
@@ -973,7 +973,7 @@ export default function SmartGuard() {
                           <p className="ibm" style={{ fontSize: 10, color: '#30D88A', marginTop: 2 }}>UID: {card.uid}</p>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="responsive-rfid-btns" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span className="ibm" style={{ fontSize: 9, color: '#5C6070' }}>Reg: {card.registeredAt}</span>
                         <button
                           onClick={() => {
@@ -1295,6 +1295,31 @@ function Styles() {
         box-shadow: 0 0 10px rgba(232,165,53,0.35); transition: box-shadow 0.15s;
       }
       input.range-styled::-webkit-slider-thumb:hover { box-shadow: 0 0 16px rgba(232,165,53,0.6); }
+
+      /* Responsive Overrides */
+      @media (max-width: 800px) {
+        .responsive-root { flex-direction: column !important; }
+        .responsive-sidebar { 
+          width: 100% !important; height: auto !important; position: sticky !important; 
+          flex-direction: row !important; align-items: center; border-right: none !important; 
+          border-bottom: 1px solid rgba(255,255,255,0.06) !important; padding: 12px 15px !important; 
+          overflow-x: auto; z-index: 30; background: rgba(5,6,8,0.95); backdrop-filter: blur(10px);
+        }
+        .responsive-sidebar-nav { flex-direction: row !important; gap: 6px !important; margin-left: 20px; }
+        .responsive-sidebar-nav button { padding: 8px 12px !important; white-space: nowrap; }
+        .responsive-sidebar-spacer { display: none !important; }
+        .responsive-sidebar-extra { display: none !important; }
+        .responsive-main { width: 100% !important; overflow-x: hidden !important; }
+        .responsive-topbar { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding: 15px !important; position: static !important; }
+        .responsive-content { padding: 15px !important; }
+        .responsive-grid-2 { grid-template-columns: 1fr !important; }
+        .responsive-flex-col { flex-direction: column !important; }
+        .responsive-logs-header { display: none !important; }
+        .responsive-log-item { grid-template-columns: 1fr !important; gap: 8px !important; padding: 12px 15px !important; }
+        .responsive-rfid-item { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+        .responsive-rfid-btns { width: 100%; justify-content: flex-end; }
+        .responsive-hero-text { font-size: 52px !important; }
+      }
     `}</style>
   );
 }
