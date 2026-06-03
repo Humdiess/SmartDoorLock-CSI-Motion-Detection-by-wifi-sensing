@@ -20,6 +20,7 @@
 #include <MFRC522.h>
 #include <SPI.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
@@ -31,8 +32,8 @@ const char *ssid = "Kucing Salto";
 const char *password = "ucing8382428";
 const char *hotspot_ssid = "SmartLock_Hotspot";
 const char *hotspot_password = "ucing8382428";
+const char *FALLBACK_SERVER_URL = "https://proj-pens-smartdoor-lock.vercel.app/api/motion";
 const char *SERVER_URL = "http://192.168.1.7:3000/api/motion";
-const char *FALLBACK_SERVER_URL = "https://proj-pens-smartdoor-lock-9iwph1yv7-humdiess-projects.vercel.app/api/motion";
 
 const int PIN_RELAY  = 16;
 const int PIN_BUZZER = 17;
@@ -89,6 +90,9 @@ unsigned long motionStartMillis = 0, lastSendTime = 0;
 unsigned long lastRFIDCheck = 0, lastCommandCheck = 0;
 float varianceBuffer[20];
 int   bufIdx = 0;
+
+// Server failover memory (sticky failover)
+bool usingPrimaryServer = true;
 
 // ============================================================
 // ==================== MELODY ENGINE =========================
@@ -433,17 +437,51 @@ void send_to_server() {
   json += "\"timestamp\":"    + String(millis());
   json += "}";
 
-  http.begin(SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
-  int code = http.POST(json);
-  http.end();
+  int code = -1;
 
-  if (code <= 0) {
-    Serial.printf("[SEND] Primary server failed (%d), trying fallback...\n", code);
+  // STICKY FAILOVER: Use whichever server is currently working
+  if (usingPrimaryServer) {
+    // Try PRIMARY (Vercel HTTPS)
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    http.begin(secureClient, SERVER_URL);
+    http.addHeader("Content-Type", "application/json");
+    code = http.POST(json);
+    http.end();
+
+    if (code <= 0) {
+      // PRIMARY failed, try FALLBACK
+      Serial.printf("[SEND] Primary failed (%d), switching to fallback...\n", code);
+      http.begin(FALLBACK_SERVER_URL);
+      http.addHeader("Content-Type", "application/json");
+      code = http.POST(json);
+      http.end();
+      if (code > 0) {
+        usingPrimaryServer = false; // Remember to use fallback from now on
+        Serial.println("[SEND] Switched to FALLBACK server");
+      }
+    }
+  } else {
+    // Try FALLBACK (Local HTTP)
     http.begin(FALLBACK_SERVER_URL);
     http.addHeader("Content-Type", "application/json");
     code = http.POST(json);
     http.end();
+
+    if (code <= 0) {
+      // FALLBACK failed, try PRIMARY
+      Serial.printf("[SEND] Fallback failed (%d), trying primary...\n", code);
+      WiFiClientSecure secureClient;
+      secureClient.setInsecure();
+      http.begin(secureClient, SERVER_URL);
+      http.addHeader("Content-Type", "application/json");
+      code = http.POST(json);
+      http.end();
+      if (code > 0) {
+        usingPrimaryServer = true; // Switch back to primary
+        Serial.println("[SEND] Switched back to PRIMARY server");
+      }
+    }
   }
 
   if (code > 0) {
@@ -463,7 +501,10 @@ void postLog(const String& type, const String& message) {
   
   String url = String(SERVER_URL);
   url.replace("/motion", "/logs");
-  http.begin(url);
+  // PRIMARY is HTTPS (Vercel)
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
+  http.begin(secureClient, url);
   http.addHeader("Content-Type", "application/json");
   int code = http.POST(json);
   http.end();
@@ -471,6 +512,7 @@ void postLog(const String& type, const String& message) {
   if (code <= 0) {
     url = String(FALLBACK_SERVER_URL);
     url.replace("/motion", "/logs");
+    // FALLBACK is HTTP (local)
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
     http.POST(json);
@@ -484,12 +526,16 @@ void checkWebCommands() {
   http.setTimeout(3000);
   String url = String(SERVER_URL);
   url.replace("/motion", "/control/commands");
-  http.begin(url);
+  // PRIMARY is HTTPS (Vercel)
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
+  http.begin(secureClient, url);
   int code = http.GET();
   if (code <= 0) {
     http.end();
     url = String(FALLBACK_SERVER_URL);
     url.replace("/motion", "/control/commands");
+    // FALLBACK is HTTP (local)
     http.begin(url);
     code = http.GET();
   }
@@ -561,6 +607,8 @@ bool connectWiFi() {
 
   // Fallback primary
   Serial.println("[WiFi] Hotspot failed, trying Primary...");
+  WiFi.disconnect();
+  delay(100);
   WiFi.begin(ssid, password);
   lcdProgressBar(0, "WiFi Primary...");
 
@@ -689,6 +737,8 @@ void loop() {
       while (WiFi.status() != WL_CONNECTED && att < 20) { delay(500); att++; }
       
       if (WiFi.status() != WL_CONNECTED) {
+        WiFi.disconnect();
+        delay(100);
         WiFi.begin(ssid, password);
         att = 0;
         while (WiFi.status() != WL_CONNECTED && att < 20) { delay(500); att++; }
