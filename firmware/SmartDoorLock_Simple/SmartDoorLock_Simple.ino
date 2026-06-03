@@ -32,6 +32,7 @@ const char *password = "ucing8382428";
 const char *hotspot_ssid = "SmartLock_Hotspot";
 const char *hotspot_password = "ucing8382428";
 const char *SERVER_URL = "http://192.168.1.7:3000/api/motion";
+const char *FALLBACK_SERVER_URL = "https://proj-pens-smartdoor-lock-9iwph1yv7-humdiess-projects.vercel.app/api/motion";
 
 const int PIN_RELAY  = 16;
 const int PIN_BUZZER = 17;
@@ -421,8 +422,6 @@ void send_to_server() {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
   http.setTimeout(3000);
-  http.begin(SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
 
   String json = "{";
   json += "\"variance\":"     + String(currentVariance, 4) + ",";
@@ -434,28 +433,49 @@ void send_to_server() {
   json += "\"timestamp\":"    + String(millis());
   json += "}";
 
+  http.begin(SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
   int code = http.POST(json);
+  http.end();
+
+  if (code <= 0) {
+    Serial.printf("[SEND] Primary server failed (%d), trying fallback...\n", code);
+    http.begin(FALLBACK_SERVER_URL);
+    http.addHeader("Content-Type", "application/json");
+    code = http.POST(json);
+    http.end();
+  }
+
   if (code > 0) {
     Serial.printf("[SEND] OK var=%.3f thr=%.3f motion=%s door=%s\n",
       currentVariance, currentThreshold,
       isMotionDetected?"YES":"NO", isDoorLocked?"LOCKED":"UNLOCKED");
   } else {
-    Serial.printf("[SEND] FAIL code=%d\n", code);
+    Serial.printf("[SEND] FAIL both servers code=%d\n", code);
   }
-  http.end();
 }
 
 void postLog(const String& type, const String& message) {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
   http.setTimeout(3000);
+  String json = "{\"type\":\"" + type + "\",\"message\":\"" + message + "\"}";
+  
   String url = String(SERVER_URL);
   url.replace("/motion", "/logs");
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
-  String json = "{\"type\":\"" + type + "\",\"message\":\"" + message + "\"}";
-  http.POST(json);
+  int code = http.POST(json);
   http.end();
+
+  if (code <= 0) {
+    url = String(FALLBACK_SERVER_URL);
+    url.replace("/motion", "/logs");
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    http.POST(json);
+    http.end();
+  }
 }
 
 void checkWebCommands() {
@@ -466,6 +486,13 @@ void checkWebCommands() {
   url.replace("/motion", "/control/commands");
   http.begin(url);
   int code = http.GET();
+  if (code <= 0) {
+    http.end();
+    url = String(FALLBACK_SERVER_URL);
+    url.replace("/motion", "/control/commands");
+    http.begin(url);
+    code = http.GET();
+  }
   if (code == 200) {
     String payload = http.getString();
     if (payload.indexOf("\"command\":\"door:unlock\"") >= 0) {
@@ -514,9 +541,28 @@ void checkWebCommands() {
 // ==================== WIFI ==================================
 // ============================================================
 bool connectWiFi() {
-  Serial.println("[WiFi] Trying primary...");
-  lcdProgressBar(0, "WiFi Primary...");
+  Serial.println("[WiFi] Trying Hotspot...");
+  lcdProgressBar(0, "WiFi Hotspot...");
+  WiFi.begin(hotspot_ssid, hotspot_password);
+
+  for (int i = 0; i < 30; i++) {
+    delay(500);
+    if (WiFi.status() == WL_CONNECTED) break;
+    if (i % 10 == 9) playMelody(MELODY_WIFI_TICK, 3);
+    lcdProgressBar(map(i, 0, 29, 0, 95), "WiFi Hotspot...");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    lcdProgressBar(100, "WiFi Hotspot...");
+    delay(200);
+    playMelody(MELODY_WIFI_OK, 3);
+    return true;
+  }
+
+  // Fallback primary
+  Serial.println("[WiFi] Hotspot failed, trying Primary...");
   WiFi.begin(ssid, password);
+  lcdProgressBar(0, "WiFi Primary...");
 
   for (int i = 0; i < 30; i++) {
     delay(500);
@@ -528,24 +574,6 @@ bool connectWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     lcdProgressBar(100, "WiFi Primary...");
-    delay(200);
-    playMelody(MELODY_WIFI_OK, 3);
-    return true;
-  }
-
-  // Fallback hotspot
-  WiFi.begin(hotspot_ssid, hotspot_password);
-  lcdProgressBar(0, "WiFi Hotspot...");
-
-  for (int i = 0; i < 30; i++) {
-    delay(500);
-    if (WiFi.status() == WL_CONNECTED) break;
-    if (i % 10 == 9) playMelody(MELODY_WIFI_TICK, 3);
-    lcdProgressBar(map(i, 0, 29, 0, 95), "WiFi Hotspot...");
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    lcdProgressBar(100, "WiFi Hotspot...");
     delay(200);
     playMelody(MELODY_WIFI_OK, 3);
     return true;
@@ -656,9 +684,15 @@ void loop() {
       playMelody(MELODY_WIFI_FAIL, 3);
 
       WiFi.disconnect(); delay(100);
-      WiFi.begin(ssid, password);
+      WiFi.begin(hotspot_ssid, hotspot_password);
       int att = 0;
       while (WiFi.status() != WL_CONNECTED && att < 20) { delay(500); att++; }
+      
+      if (WiFi.status() != WL_CONNECTED) {
+        WiFi.begin(ssid, password);
+        att = 0;
+        while (WiFi.status() != WL_CONNECTED && att < 20) { delay(500); att++; }
+      }
 
       if (WiFi.status() == WL_CONNECTED) {
         WiFi.setSleep(false);
