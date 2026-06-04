@@ -441,10 +441,8 @@ void send_to_server() {
 
   // FAST STICKY FAILOVER: Only try ONE server per call to minimize blocking
   if (usingPrimaryServer) {
-    // Try PRIMARY (Vercel HTTPS)
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    http.begin(secureClient, SERVER_URL);
+    // Try PRIMARY (Localhost HTTP)
+    http.begin(SERVER_URL);  // Localhost - HTTP biasa
     http.addHeader("Content-Type", "application/json");
     code = http.POST(json);
     http.end();
@@ -455,8 +453,10 @@ void send_to_server() {
       usingPrimaryServer = false;
     }
   } else {
-    // Try FALLBACK (Local HTTP)
-    http.begin(FALLBACK_SERVER_URL);
+    // Try FALLBACK (Vercel HTTPS)
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    http.begin(secureClient, FALLBACK_SERVER_URL);  // Vercel - HTTPS secure
     http.addHeader("Content-Type", "application/json");
     code = http.POST(json);
     http.end();
