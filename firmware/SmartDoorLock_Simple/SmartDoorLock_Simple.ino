@@ -425,7 +425,7 @@ void calibrate_system() {
 void send_to_server() {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
-  http.setTimeout(3000);
+  http.setTimeout(800); // REDUCED: 3000ms -> 800ms to prevent blocking motion detection
 
   String json = "{";
   json += "\"variance\":"     + String(currentVariance, 4) + ",";
@@ -439,7 +439,7 @@ void send_to_server() {
 
   int code = -1;
 
-  // STICKY FAILOVER: Use whichever server is currently working
+  // FAST STICKY FAILOVER: Only try ONE server per call to minimize blocking
   if (usingPrimaryServer) {
     // Try PRIMARY (Vercel HTTPS)
     WiFiClientSecure secureClient;
@@ -450,16 +450,9 @@ void send_to_server() {
     http.end();
 
     if (code <= 0) {
-      // PRIMARY failed, try FALLBACK
-      Serial.printf("[SEND] Primary failed (%d), switching to fallback...\n", code);
-      http.begin(FALLBACK_SERVER_URL);
-      http.addHeader("Content-Type", "application/json");
-      code = http.POST(json);
-      http.end();
-      if (code > 0) {
-        usingPrimaryServer = false; // Remember to use fallback from now on
-        Serial.println("[SEND] Switched to FALLBACK server");
-      }
+      // PRIMARY failed, switch to fallback for NEXT cycle (don't retry now)
+      Serial.printf("[SEND] Primary failed (%d), will try fallback next cycle\n", code);
+      usingPrimaryServer = false;
     }
   } else {
     // Try FALLBACK (Local HTTP)
@@ -469,18 +462,9 @@ void send_to_server() {
     http.end();
 
     if (code <= 0) {
-      // FALLBACK failed, try PRIMARY
-      Serial.printf("[SEND] Fallback failed (%d), trying primary...\n", code);
-      WiFiClientSecure secureClient;
-      secureClient.setInsecure();
-      http.begin(secureClient, SERVER_URL);
-      http.addHeader("Content-Type", "application/json");
-      code = http.POST(json);
-      http.end();
-      if (code > 0) {
-        usingPrimaryServer = true; // Switch back to primary
-        Serial.println("[SEND] Switched back to PRIMARY server");
-      }
+      // FALLBACK failed, switch to primary for NEXT cycle (don't retry now)
+      Serial.printf("[SEND] Fallback failed (%d), will try primary next cycle\n", code);
+      usingPrimaryServer = true;
     }
   }
 
@@ -489,7 +473,7 @@ void send_to_server() {
       currentVariance, currentThreshold,
       isMotionDetected?"YES":"NO", isDoorLocked?"LOCKED":"UNLOCKED");
   } else {
-    Serial.printf("[SEND] FAIL both servers code=%d\n", code);
+    Serial.printf("[SEND] FAIL code=%d (switched server for next attempt)\n", code);
   }
 }
 
