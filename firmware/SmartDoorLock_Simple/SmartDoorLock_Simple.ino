@@ -33,7 +33,7 @@ const char *password = "ucing8382428";
 const char *hotspot_ssid = "SmartLock_Hotspot";
 const char *hotspot_password = "ucing8382428";
 const char *FALLBACK_SERVER_URL = "https://proj-pens-smartdoor-lock.vercel.app/api/motion";
-const char *SERVER_URL = "http://192.168.1.7:3000/api/motion";
+const char *SERVER_URL = "http://192.168.1.9:3000/api/motion";
 
 const int PIN_RELAY  = 16;
 const int PIN_BUZZER = 17;
@@ -425,7 +425,7 @@ void calibrate_system() {
 void send_to_server() {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
-  http.setTimeout(800); // REDUCED: 3000ms -> 800ms to prevent blocking motion detection
+  http.setTimeout(1500); // Balanced: fast enough (non-blocking) but allows for network latency
 
   String json = "{";
   json += "\"variance\":"     + String(currentVariance, 4) + ",";
