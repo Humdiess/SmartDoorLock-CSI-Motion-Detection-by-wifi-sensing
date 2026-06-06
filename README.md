@@ -7,18 +7,26 @@ Smart Door Lock dengan WiFi-based motion detection menggunakan ESP32 dan Next.js
 ```
 SmartDoorLock/
 ├── firmware/
-│   └── SmartDoorLock.ino          # ESP32 firmware
+│   └── SmartDoorLock_Simple/
+│       └── SmartDoorLock_Simple.ino    # ESP32 firmware
 ├── dashboard/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── api/               # API endpoints
-│   │   │   ├── page.tsx           # Dashboard UI
-│   │   │   ├── globals.css        # Styling
+│   │   │   ├── api/                    # API endpoints
+│   │   │   ├── page.tsx                # Dashboard UI
+│   │   │   ├── globals.css             # Styling
 │   │   │   └── layout.tsx
 │   │   └── ...
 │   ├── package.json
-│   ├── tsconfig.json
 │   └── ...
+├── testing/                             # 🆕 Testing Framework
+│   ├── run_tests.bat                   # Windows launcher
+│   ├── data_logger.py                  # Data capture tool
+│   ├── analyze_results.py              # Analysis tool
+│   ├── START_HERE.md                   # Complete guide
+│   ├── QUICK_START.md                  # Quick guide
+│   └── REPORT_TEMPLATE.md              # Report template
+├── TESTING_PROTOCOL.md                  # Testing methodology
 ├── README.md
 └── .gitignore
 ```
@@ -84,6 +92,51 @@ SmartDoorLock/
 - ✅ LED status indicator
 - ✅ HTTP POST to dashboard
 - ✅ Debounce logic
+
+## 🧪 Testing Framework
+
+### Automated Testing Tools
+
+Framework lengkap untuk testing dan evaluasi sistem deteksi gerakan:
+
+**📁 Location:** [`testing/`](testing/)
+
+**🎯 Test Coverage:**
+1. **Range Test** - Jarak deteksi maksimal (meter)
+2. **Angle Test** - Field of view (derajat)
+3. **Object Discrimination** - Kemampuan bedakan manusia vs objek
+
+**🚀 Quick Start:**
+```bash
+cd testing
+pip install -r requirements.txt
+
+# Run with launcher (Windows)
+run_tests.bat
+
+# Or manual
+python data_logger.py range_test 30 COM3
+python analyze_results.py test_data/[file].csv
+```
+
+**📚 Documentation:**
+- **[START_HERE.md](testing/START_HERE.md)** - Complete guide & checklist
+- **[QUICK_START.md](testing/QUICK_START.md)** - 5-minute quick start
+- **[TESTING_PROTOCOL.md](TESTING_PROTOCOL.md)** - Detailed methodology
+- **[REPORT_TEMPLATE.md](testing/REPORT_TEMPLATE.md)** - Report template
+
+**🛠️ Tools:**
+- `data_logger.py` - Auto-capture serial data from ESP32
+- `analyze_results.py` - Generate statistics & graphs
+- `run_tests.bat` - Windows launcher with menu
+
+**📊 Output:**
+- CSV data files with variance, RSSI, motion events
+- Timeline graphs (variance over time)
+- Histogram distributions
+- Statistical summaries (JSON)
+
+---
 
 ## 🔧 API Endpoints
 
