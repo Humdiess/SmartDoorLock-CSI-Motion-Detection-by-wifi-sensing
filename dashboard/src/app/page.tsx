@@ -28,23 +28,23 @@ interface LogEntry {
 type Tab = 'dashboard' | 'settings' | 'logs' | 'control' | 'rfid';
 
 const LOG_META = {
-  motion:           { tag: 'MOTION', clr: '#E84040', bg: 'rgba(232,64,64,0.1)'      },
-  calibration:      { tag: 'CALIB',  clr: '#8B8BFF', bg: 'rgba(139,139,255,0.1)'   },
-  threshold_change: { tag: 'CONFIG', clr: '#E8A535', bg: 'rgba(232,165,53,0.1)'    },
-  system:           { tag: 'SYSTEM', clr: '#30D88A', bg: 'rgba(48,216,138,0.1)'    },
+  motion: { tag: 'MOTION', clr: '#E84040', bg: 'rgba(232,64,64,0.1)' },
+  calibration: { tag: 'CALIB', clr: '#8B8BFF', bg: 'rgba(139,139,255,0.1)' },
+  threshold_change: { tag: 'CONFIG', clr: '#E8A535', bg: 'rgba(232,165,53,0.1)' },
+  system: { tag: 'SYSTEM', clr: '#30D88A', bg: 'rgba(48,216,138,0.1)' },
 } as const;
 
 /* ── Component ─────────────────────────────────── */
 export default function SmartGuard() {
-  const [tab,      setTab]      = useState<Tab>('dashboard');
-  const [motion,   setMotion]   = useState<MotionData | null>(null);
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [motion, setMotion] = useState<MotionData | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [logs,     setLogs]     = useState<LogEntry[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [thr,      setThr]      = useState('0.60');
-  const [deb,      setDeb]      = useState('5000');
-  const [now,      setNow]      = useState(new Date());
-  
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [thr, setThr] = useState('0.60');
+  const [deb, setDeb] = useState('5000');
+  const [now, setNow] = useState(new Date());
+
   // Control states
   const [doorLocked, setDoorLocked] = useState(true);
   const [buzzerOn, setBuzzerOn] = useState(false);
@@ -56,7 +56,7 @@ export default function SmartGuard() {
   const [rfidLogs, setRfidLogs] = useState<Array<{
     id: string; uid: string; status: 'Authorized' | 'Denied'; timestamp: string; name?: string;
   }>>([]);
-  
+
   // ESP32 Connection Status
   const [isConnected, setIsConnected] = useState(false);
 
@@ -231,7 +231,7 @@ export default function SmartGuard() {
           setThr(d.threshold.toString());
           setDeb(d.debounceDelay.toString());
         }
-      } catch {}
+      } catch { }
     };
     go();
   }, []);
@@ -242,7 +242,7 @@ export default function SmartGuard() {
       try {
         const r = await fetch('/api/logs?limit=100');
         if (r.ok) { const d = await r.json(); setLogs(d.logs); }
-      } catch {}
+      } catch { }
     };
     go();
     const id = setInterval(go, 5000);
@@ -255,7 +255,7 @@ export default function SmartGuard() {
       try {
         const r = await fetch('/api/rfid/logs?limit=50');
         if (r.ok) { const d = await r.json(); setRfidLogs(d.logs); }
-      } catch {}
+      } catch { }
     };
     fetchRfidLogs();
     const id = setInterval(fetchRfidLogs, 5000);
@@ -273,10 +273,10 @@ export default function SmartGuard() {
       });
       if (r.ok) {
         const d = await r.json(); setSettings(d.settings);
-        
+
         // Send threshold command to ESP32
         await sendCommand('threshold', t.toString());
-        
+
         await fetch('/api/logs', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -286,14 +286,14 @@ export default function SmartGuard() {
           }),
         });
       }
-    } catch {}
+    } catch { }
   };
 
   const calibrate = async () => {
     try {
       // Send calibrate command to ESP32
       await sendCommand('calibrate', 'true');
-      
+
       const r = await fetch('/api/settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ calibrationMode: true }),
@@ -306,12 +306,12 @@ export default function SmartGuard() {
         });
         alert('Kalibrasi dimulai — ESP32 akan kalibrasi selama 5 detik. Jangan bergerak!');
       }
-    } catch {}
+    } catch { }
   };
 
   const clearLogs = async () => {
     if (!confirm('Hapus semua log?')) return;
-    try { await fetch('/api/logs', { method: 'DELETE' }); setLogs([]); } catch {}
+    try { await fetch('/api/logs', { method: 'DELETE' }); setLogs([]); } catch { }
   };
 
   /* loading */
@@ -325,8 +325,8 @@ export default function SmartGuard() {
     </div>
   );
 
-  const cur     = motion?.current;
-  const hist    = motion?.history ?? [];
+  const cur = motion?.current;
+  const hist = motion?.history ?? [];
   const isAlert = !!cur?.motion;
 
   /* ── RENDER ─────────────────────────────────── */
@@ -353,11 +353,11 @@ export default function SmartGuard() {
         {/* nav */}
         <nav className="responsive-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {([
-            ['dashboard', 'Overview',      OverviewIcon],
-            ['settings',  'Configuration', ConfigIcon  ],
-            ['control',   'Control',       ControlIcon ],
-            ['rfid',      'RFID Cards',    RfidIcon    ],
-            ['logs',      'Event Log',     LogIcon     ],
+            ['dashboard', 'Overview', OverviewIcon],
+            ['settings', 'Configuration', ConfigIcon],
+            ['control', 'Control', ControlIcon],
+            ['rfid', 'RFID Cards', RfidIcon],
+            ['logs', 'Event Log', LogIcon],
           ] as const).map(([id, label, Icon]) => (
             <NavBtn key={id} active={tab === id} onClick={() => setTab(id)}>
               <Icon active={tab === id} />
@@ -372,8 +372,8 @@ export default function SmartGuard() {
         {/* mini status */}
         <div className="responsive-sidebar-extra" style={{
           ...S.miniStatus,
-          background:   isAlert ? 'rgba(232,64,64,0.08)'   : 'rgba(255,255,255,0.025)',
-          borderColor:  isAlert ? 'rgba(232,64,64,0.22)'   : 'rgba(255,255,255,0.07)',
+          background: isAlert ? 'rgba(232,64,64,0.08)' : 'rgba(255,255,255,0.025)',
+          borderColor: isAlert ? 'rgba(232,64,64,0.22)' : 'rgba(255,255,255,0.07)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
             <span style={{
@@ -427,9 +427,9 @@ export default function SmartGuard() {
         <div className="responsive-topbar" style={S.topbar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={S.topbarTitle}>
-              { tab === 'dashboard' ? 'System Overview'
-              : tab === 'settings'  ? 'Configuration'
-              :                       'Event Log' }
+              {tab === 'dashboard' ? 'System Overview'
+                : tab === 'settings' ? 'Configuration'
+                  : 'Event Log'}
             </h1>
             {tab === 'logs' && (
               <span className="ibm" style={S.logBadge}>{logs.length} events</span>
@@ -591,12 +591,12 @@ export default function SmartGuard() {
                   </div>
                   <div style={{ display: 'flex', gap: 20 }}>
                     {[
-                      { clr: '#E8A535', label: 'Variance',  dash: false },
-                      { clr: '#E84040', label: 'Threshold', dash: true  },
+                      { clr: '#E8A535', label: 'Variance', dash: false },
+                      { clr: '#E84040', label: 'Threshold', dash: true },
                     ].map(({ clr, label, dash }) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <svg width="18" height="10" viewBox="0 0 18 10">
-                          { dash
+                          {dash
                             ? <line x1="0" y1="5" x2="18" y2="5" stroke={clr} strokeWidth="1.5" strokeDasharray="4 3" strokeOpacity="0.55" />
                             : <line x1="0" y1="5" x2="18" y2="5" stroke={clr} strokeWidth="2" />
                           }
@@ -612,8 +612,8 @@ export default function SmartGuard() {
                     <AreaChart data={hist} margin={{ top: 5, right: 5, left: -18, bottom: 0 }}>
                       <defs>
                         <linearGradient id="varGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%"   stopColor="#E8A535" stopOpacity={0.28} />
-                          <stop offset="100%" stopColor="#E8A535" stopOpacity={0}    />
+                          <stop offset="0%" stopColor="#E8A535" stopOpacity={0.28} />
+                          <stop offset="100%" stopColor="#E8A535" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="1 8" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -628,7 +628,7 @@ export default function SmartGuard() {
                         labelStyle={{ color: '#5C6070', marginBottom: 4, fontSize: 10 }}
                         itemStyle={{ color: '#DDD9D0' }}
                       />
-                      <Area type="monotone" dataKey="variance"  stroke="#E8A535" strokeWidth={1.5} fill="url(#varGrad)" dot={false} name="Variance" />
+                      <Area type="monotone" dataKey="variance" stroke="#E8A535" strokeWidth={1.5} fill="url(#varGrad)" dot={false} name="Variance" />
                       <Area type="monotone" dataKey="threshold" stroke="#E84040" strokeWidth={1} strokeDasharray="5 5" fill="none" dot={false} name="Threshold" opacity={0.45} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -670,7 +670,7 @@ export default function SmartGuard() {
 
                 <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 32 }}>
                   <PrimaryBtn onClick={saveSettings}>Simpan Konfigurasi</PrimaryBtn>
-                  <GhostBtn   onClick={calibrate}>Kalibrasi Ulang</GhostBtn>
+                  <GhostBtn onClick={calibrate}>Kalibrasi Ulang</GhostBtn>
                 </div>
               </div>
 
@@ -695,7 +695,7 @@ export default function SmartGuard() {
               <div style={{ ...S.card, padding: 32, marginBottom: 14 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>Door Lock Control</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 20 }}>Manual kontrol solenoid lock</p>
-                
+
                 <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <button
                     onClick={() => sendCommand('door', 'unlock')}
@@ -738,7 +738,7 @@ export default function SmartGuard() {
                     🔒 Kunci Pintu
                   </button>
                 </div>
-                
+
                 <div style={{ marginTop: 16, padding: '12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <p className="ibm" style={{ fontSize: 9, color: '#30333D', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>Status</p>
                   <p style={{ fontSize: 13, color: doorLocked ? '#E84040' : '#30D88A' }}>
@@ -751,7 +751,7 @@ export default function SmartGuard() {
               <div style={{ ...S.card, padding: 32, marginBottom: 14 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>Buzzer Control</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 20 }}>Manual kontrol alarm buzzer</p>
-                
+
                 <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <button
                     onClick={() => sendCommand('buzzer', 'on')}
@@ -794,7 +794,7 @@ export default function SmartGuard() {
                     🔇 Matikan
                   </button>
                 </div>
-                
+
                 <div style={{ marginTop: 16, padding: '12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <p className="ibm" style={{ fontSize: 9, color: '#30333D', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>Status</p>
                   <p style={{ fontSize: 13, color: buzzerOn ? '#E8A535' : '#5C6070' }}>
@@ -807,7 +807,7 @@ export default function SmartGuard() {
               <div style={{ ...S.card, padding: 32 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>LCD Message</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 16 }}>Kirim pesan ke LCD (komunikasi dengan tamu)</p>
-                
+
                 <input
                   type="text"
                   value={lcdMsg}
@@ -826,11 +826,11 @@ export default function SmartGuard() {
                     boxSizing: 'border-box',
                   }}
                 />
-                
+
                 <p className="ibm" style={{ fontSize: 9, color: '#30333D', marginBottom: 12 }}>
                   {lcdMsg.length}/16 karakter
                 </p>
-                
+
                 <button
                   onClick={() => {
                     if (lcdMsg.trim()) {
@@ -863,7 +863,7 @@ export default function SmartGuard() {
               <div style={{ ...S.card, padding: 32, marginTop: 14 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>🧪 Test Telegram Alert</p>
                 <p style={{ fontSize: 12, color: '#5C6070', marginBottom: 16 }}>Send test alert to Telegram</p>
-                
+
                 <button
                   onClick={testTelegram}
                   disabled={sending}
@@ -1005,17 +1005,17 @@ export default function SmartGuard() {
                     {rfidLogs.length} SCANS
                   </span>
                 </div>
-                
+
                 <div style={{ maxHeight: 400, overflowY: 'auto' }}>
                   {rfidLogs.length > 0 ? rfidLogs.map((log) => (
                     <div key={log.id} style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '12px 16px', borderRadius: 8, marginBottom: 8,
-                      background: log.status === 'Authorized' 
-                        ? 'rgba(48,216,138,0.05)' 
+                      background: log.status === 'Authorized'
+                        ? 'rgba(48,216,138,0.05)'
                         : 'rgba(232,64,64,0.05)',
-                      border: `1px solid ${log.status === 'Authorized' 
-                        ? 'rgba(48,216,138,0.15)' 
+                      border: `1px solid ${log.status === 'Authorized'
+                        ? 'rgba(48,216,138,0.15)'
                         : 'rgba(232,64,64,0.15)'}`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1034,8 +1034,8 @@ export default function SmartGuard() {
                       <span className="ibm" style={{
                         fontSize: 9, padding: '3px 8px', borderRadius: 4,
                         color: log.status === 'Authorized' ? '#30D88A' : '#E84040',
-                        background: log.status === 'Authorized' 
-                          ? 'rgba(48,216,138,0.1)' 
+                        background: log.status === 'Authorized'
+                          ? 'rgba(48,216,138,0.1)'
                           : 'rgba(232,64,64,0.1)',
                         fontWeight: 700, letterSpacing: '0.1em',
                       }}>
@@ -1062,24 +1062,24 @@ export default function SmartGuard() {
 
 /* ── Styles object ──────────────────────────────── */
 const S = {
-  root:       { background: '#050608', minHeight: '100vh', display: 'flex', color: '#DDD9D0' },
-  loadWrap:   { background: '#050608', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  spinner:    { width: 38, height: 38, border: '1px solid rgba(232,165,53,0.25)', borderRadius: '50%', borderTopColor: '#E8A535', animation: 'spin 1s linear infinite', margin: '0 auto 18px' },
-  loadText:   { fontSize: 9, letterSpacing: '0.45em', color: 'rgba(232,165,53,0.45)', textTransform: 'uppercase' as const },
-  ambientGlow:{ position: 'fixed' as const, inset: 0, pointerEvents: 'none' as const, zIndex: 0, background: 'radial-gradient(ellipse 65% 55% at 20% 50%, rgba(232,64,64,0.055) 0%, transparent 70%)', transition: 'opacity 1s' },
-  sidebar:    { width: 190, flexShrink: 0, position: 'sticky' as const, top: 0, height: '100vh', display: 'flex', flexDirection: 'column' as const, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '26px 14px', zIndex: 10 },
-  brand:      { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 },
-  brandName:  { fontSize: 13, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.01em' },
-  brandSub:   { fontSize: 8, color: 'rgba(232,165,53,0.5)', letterSpacing: '0.32em', textTransform: 'uppercase' as const, marginTop: 2 },
-  navDot:     { marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: '#E8A535', flexShrink: 0 },
+  root: { background: '#050608', minHeight: '100vh', display: 'flex', color: '#DDD9D0' },
+  loadWrap: { background: '#050608', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  spinner: { width: 38, height: 38, border: '1px solid rgba(232,165,53,0.25)', borderRadius: '50%', borderTopColor: '#E8A535', animation: 'spin 1s linear infinite', margin: '0 auto 18px' },
+  loadText: { fontSize: 9, letterSpacing: '0.45em', color: 'rgba(232,165,53,0.45)', textTransform: 'uppercase' as const },
+  ambientGlow: { position: 'fixed' as const, inset: 0, pointerEvents: 'none' as const, zIndex: 0, background: 'radial-gradient(ellipse 65% 55% at 20% 50%, rgba(232,64,64,0.055) 0%, transparent 70%)', transition: 'opacity 1s' },
+  sidebar: { width: 190, flexShrink: 0, position: 'sticky' as const, top: 0, height: '100vh', display: 'flex', flexDirection: 'column' as const, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '26px 14px', zIndex: 10 },
+  brand: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 },
+  brandName: { fontSize: 13, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.01em' },
+  brandSub: { fontSize: 8, color: 'rgba(232,165,53,0.5)', letterSpacing: '0.32em', textTransform: 'uppercase' as const, marginTop: 2 },
+  navDot: { marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: '#E8A535', flexShrink: 0 },
   miniStatus: { padding: '14px 12px', borderRadius: 11, border: '1px solid' },
-  main:       { flex: 1, display: 'flex', flexDirection: 'column' as const, minWidth: 0, position: 'relative' as const, zIndex: 1 },
-  topbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '19px 34px', borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', background: 'rgba(5,6,8,0.85)', position: 'sticky' as const, top: 0, zIndex: 20 },
-  topbarTitle:{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' },
-  logBadge:   { fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(232,165,53,0.1)', color: '#E8A535', letterSpacing: '0.08em', fontFamily: 'IBM Plex Mono, monospace' },
-  content:    { padding: '30px 34px', flex: 1, overflowY: 'auto' as const },
-  card:       { background: 'linear-gradient(145deg, rgba(255,255,255,0.027), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, position: 'relative' as const, overflow: 'hidden' as const },
-  eyebrow:    { fontSize: 9, letterSpacing: '0.32em', color: '#30333D', textTransform: 'uppercase' as const, fontWeight: 500, marginBottom: 8 },
+  main: { flex: 1, display: 'flex', flexDirection: 'column' as const, minWidth: 0, position: 'relative' as const, zIndex: 1 },
+  topbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '19px 34px', borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', background: 'rgba(5,6,8,0.85)', position: 'sticky' as const, top: 0, zIndex: 20 },
+  topbarTitle: { fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' },
+  logBadge: { fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(232,165,53,0.1)', color: '#E8A535', letterSpacing: '0.08em', fontFamily: 'IBM Plex Mono, monospace' },
+  content: { padding: '30px 34px', flex: 1, overflowY: 'auto' as const },
+  card: { background: 'linear-gradient(145deg, rgba(255,255,255,0.027), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, position: 'relative' as const, overflow: 'hidden' as const },
+  eyebrow: { fontSize: 9, letterSpacing: '0.32em', color: '#30333D', textTransform: 'uppercase' as const, fontWeight: 500, marginBottom: 8 },
 } as const;
 
 /* ── Sub-components ─────────────────────────────── */
@@ -1197,9 +1197,9 @@ function OverviewIcon({ active }: { active: boolean }) {
   const c = active ? '#E8A535' : 'currentColor';
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <rect x="1"   y="7.5" width="3.5" height="5.5" rx="1" fill={c} opacity={active ? 1   : 0.45} />
-      <rect x="5.5" y="4"   width="3.5" height="9"   rx="1" fill={c} opacity={active ? 0.7 : 0.3 } />
-      <rect x="10"  y="1"   width="3"   height="12"  rx="1" fill={c} opacity={active ? 0.4 : 0.2 } />
+      <rect x="1" y="7.5" width="3.5" height="5.5" rx="1" fill={c} opacity={active ? 1 : 0.45} />
+      <rect x="5.5" y="4" width="3.5" height="9" rx="1" fill={c} opacity={active ? 0.7 : 0.3} />
+      <rect x="10" y="1" width="3" height="12" rx="1" fill={c} opacity={active ? 0.4 : 0.2} />
     </svg>
   );
 }
@@ -1296,7 +1296,7 @@ function Styles() {
       }
       input.range-styled::-webkit-slider-thumb:hover { box-shadow: 0 0 16px rgba(232,165,53,0.6); }
 
-      /* Responsive Overrides */
+      /* Responsive Overrides - Tablet & Mobile */
       @media (max-width: 800px) {
         .responsive-root { flex-direction: column !important; }
         .responsive-sidebar { 
@@ -1306,19 +1306,69 @@ function Styles() {
           overflow-x: auto; z-index: 30; background: rgba(5,6,8,0.95); backdrop-filter: blur(10px);
         }
         .responsive-sidebar-nav { flex-direction: row !important; gap: 6px !important; margin-left: 20px; }
-        .responsive-sidebar-nav button { padding: 8px 12px !important; white-space: nowrap; }
+        .responsive-sidebar-nav button { padding: 8px 12px !important; white-space: nowrap; font-size: 12px !important; }
         .responsive-sidebar-spacer { display: none !important; }
         .responsive-sidebar-extra { display: none !important; }
         .responsive-main { width: 100% !important; overflow-x: hidden !important; }
-        .responsive-topbar { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding: 15px !important; position: static !important; }
+        .responsive-topbar { 
+          flex-direction: column !important; align-items: flex-start !important; 
+          gap: 10px !important; padding: 15px !important; position: static !important; 
+        }
         .responsive-content { padding: 15px !important; }
-        .responsive-grid-2 { grid-template-columns: 1fr !important; }
+        .responsive-grid-2 { grid-template-columns: 1fr !important; gap: 12px !important; }
         .responsive-flex-col { flex-direction: column !important; }
         .responsive-logs-header { display: none !important; }
-        .responsive-log-item { grid-template-columns: 1fr !important; gap: 8px !important; padding: 12px 15px !important; }
-        .responsive-rfid-item { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+        .responsive-log-item { 
+          grid-template-columns: 1fr !important; gap: 8px !important; 
+          padding: 12px 15px !important; 
+        }
+        .responsive-rfid-item { 
+          flex-direction: column !important; align-items: flex-start !important; 
+          gap: 12px !important; 
+        }
         .responsive-rfid-btns { width: 100%; justify-content: flex-end; }
         .responsive-hero-text { font-size: 52px !important; }
+        
+        /* Better touch targets on mobile */
+        button { min-height: 44px !important; }
+        input[type="range"] { height: 6px !important; }
+        input[type="range"]::-webkit-slider-thumb { 
+          width: 20px !important; height: 20px !important; 
+        }
+      }
+      
+      /* Small Mobile Phones */
+      @media (max-width: 480px) {
+        .responsive-hero-text { font-size: 42px !important; }
+        .responsive-sidebar-nav button { 
+          padding: 6px 10px !important; 
+          font-size: 11px !important; 
+        }
+        .responsive-topbar h1 { font-size: 14px !important; }
+        .responsive-content { padding: 12px !important; }
+        
+        /* Stack all buttons vertically on very small screens */
+        .responsive-grid-2 button { 
+          width: 100% !important; 
+          padding: 12px !important; 
+        }
+        
+        /* Improve chart readability */
+        .recharts-wrapper { font-size: 9px !important; }
+        
+        /* Compact cards */
+        .glass-card { padding: 16px !important; }
+      }
+      
+      /* Landscape mobile optimization */
+      @media (max-width: 800px) and (orientation: landscape) {
+        .responsive-sidebar { 
+          padding: 8px 12px !important; 
+        }
+        .responsive-sidebar-nav button { 
+          padding: 6px 10px !important; 
+        }
+        .responsive-hero-text { font-size: 38px !important; }
       }
     `}</style>
   );
